@@ -1585,6 +1585,13 @@ service cloud.firestore {
   const recfgBtn=el('button',{className:'btn btn-ghost'});recfgBtn.textContent='⚙️ Reconfigurar';recfgBtn.onclick=()=>{if(!confirm('Isso irá sair de todas as empresas. Continuar?'))return;stopListeners();LS.del('fbCfg');S.screen='setup';S.company=null;S.user=null;render();};rowFB.append(recfgBtn);secFB.append(rowFB);
 
   // ── Estatísticas ──
+  const secAudit=el('div',{className:'settings-section'});
+  secAudit.innerHTML='<p style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;">Alteracoes de Perfil</p>';
+  const auditCard=el('div',{className:'card',style:'padding:0;overflow:hidden;'});
+  auditCard.innerHTML='<p style="color:var(--dim);font-size:12px;padding:12px;">Carregando...</p>';
+  if(S.company?.id){db.collection('companies').doc(S.company.id).collection('audits').orderBy('ts','desc').limit(20).get().then(snap=>{auditCard.innerHTML='';if(!snap.docs.length){auditCard.innerHTML='<p style="color:var(--dim);font-size:12px;padding:12px;">Nenhuma alteracao.</p>';return;}snap.docs.forEach(d=>{const a=d.data();const row=el('div',{style:'padding:10px 14px;border-bottom:1px solid var(--border);'});row.innerHTML='<p style="font-size:12px;font-weight:500;">'+a.funcNome+' — '+fmtD(a.data)+'</p><p style="font-size:11px;color:var(--muted);">'+a.changes+'</p>';auditCard.append(row);});}).catch(()=>{});}
+  secAudit.append(auditCard);
+
   const secS=el('div',{className:'settings-section'});
   secS.innerHTML='<p style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;">📊 Estatísticas Gerais</p>';
   const gs=el('div',{className:'grid-auto'});
@@ -1702,33 +1709,41 @@ function buildMeuPerfil(){
   topRow.append(fotoCirc,fotoInp,infoDiv);card.append(topRow);
   // Campos editáveis
   const grid=el('div',{className:'grid2'});
+  const fNome=mkField('Nome Completo','mp-nome','text','');fNome.querySelector('input').value=me.nome||'';
+  const fCpf=mkField('CPF','mp-cpf','text','000.000.000-00');fCpf.querySelector('input').value=me.cpf||'';
+  const fRg=mkField('RG','mp-rg','text','');fRg.querySelector('input').value=me.rg||'';
+  const fNasc=mkField('Data Nasc.','mp-nasc','date','');fNasc.querySelector('input').value=me.nasc||'';
   const fTel=mkField('Telefone','mp-tel','text','(14) 99999-0000');fTel.querySelector('input').value=me.tel||'';
-  const fEmail=mkField('E-mail','mp-email','email','seu@email.com');fEmail.querySelector('input').value=me.email||'';
-  const fPw=el('div',{className:'field col-2'});fPw.innerHTML='<label>Nova Senha (deixe em branco para manter atual)</label>';
-  const fPwI=el('input',{type:'password',id:'mp-senha',placeholder:'Nova senha...',style:'background:var(--input);border:1px solid var(--border);border-radius:6px;padding:8px 11px;color:var(--text);font-size:13px;width:100%;outline:none;'});fPw.append(fPwI);
-  grid.append(fTel,fEmail,fPw);card.append(grid);
-  // Info readonly
+  const fEmail=mkField('E-mail','mp-email','email','');fEmail.querySelector('input').value=me.email||'';
+  const fPw=el('div',{className:'field col-2'});fPw.innerHTML='<label>Nova Senha (em branco = manter atual)</label>';
+  const fPwI=el('input',{type:'password',id:'mp-senha',placeholder:'Nova senha (min 4 caracteres)...',style:'background:var(--input);border:1px solid var(--border);border-radius:6px;padding:8px 11px;color:var(--text);font-size:13px;width:100%;outline:none;'});fPw.append(fPwI);
+  grid.append(fNome,fCpf,fRg,fNasc,fTel,fEmail,fPw);card.append(grid);
   const roInfo=el('div',{style:'margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:10px;'});
-  roInfo.innerHTML='<div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Diaria Base</p><p style="font-size:14px;color:var(--amber);font-weight:600;">'+(me.cargo==='master'?'—':fmt$(me.diaria||0))+'</p></div><div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Data de Entrada</p><p style="font-size:13px;">'+(me.created?fmtD(me.created.slice(0,10)):'—')+'</p></div>';
+  roInfo.innerHTML='<div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Diaria Base</p><p style="font-size:14px;color:var(--amber);font-weight:600;">'+(me.cargo==='master'?'—':fmt$(me.diaria||0))+'</p></div><div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Cargo</p><p style="font-size:13px;">'+(CARGOS_LABEL[me.cargo]||me.cargo)+'</p></div>';
   card.append(roInfo);
   window._mpFoto=null;
   const btns=el('div',{style:'display:flex;gap:10px;margin-top:16px;'});
-  const sv=el('button',{className:'btn btn-amber'});sv.textContent='Salvar alteracoes';
+  const sv=el('button',{className:'btn btn-amber',style:'flex:1;justify-content:center;'});sv.textContent='Salvar alteracoes';
   sv.onclick=async()=>{
+    const nome=(document.getElementById('mp-nome')?.value||'').trim();
+    const cpf=(document.getElementById('mp-cpf')?.value||'').trim();
+    const rg=(document.getElementById('mp-rg')?.value||'').trim();
+    const nasc=(document.getElementById('mp-nasc')?.value||'');
     const tel=(document.getElementById('mp-tel')?.value||'').trim();
     const email=(document.getElementById('mp-email')?.value||'').trim();
     const novaSenha=(document.getElementById('mp-senha')?.value||'').trim();
     const foto=window._mpFoto||me.foto||null;
+    if(!nome){toast('Nome obrigatorio.',true);return;}
     if(novaSenha&&novaSenha.length<4){toast('Senha muito curta.',true);return;}
-    // Build audit log
     const changes=[];
-    if(tel!==me.tel)changes.push('Tel: '+me.tel+' -> '+tel);
-    if(email!==me.email)changes.push('Email: '+me.email+' -> '+email);
+    if(nome!==me.nome)changes.push('Nome: '+me.nome+' -> '+nome);
+    if(cpf!==me.cpf)changes.push('CPF: '+me.cpf+' -> '+cpf);
+    if(tel!==me.tel)changes.push('Tel: '+(me.tel||'-')+' -> '+tel);
+    if(email!==me.email)changes.push('Email: '+(me.email||'-')+' -> '+email);
     if(novaSenha)changes.push('Senha alterada');
     if(foto&&foto!==me.foto)changes.push('Foto atualizada');
-    const updated={...me,tel,email,foto};
+    const updated={...me,nome,cpf,rg,nasc,tel,email,foto};
     if(novaSenha)updated.senha=novaSenha;
-    // Save audit to Firestore
     if(changes.length>0){
       const audit={id:nid(),funcId:me.id,funcNome:me.nome,changes:changes.join(' | '),data:today,ts:Date.now()};
       db.collection('companies').doc(S.company.id).collection('audits').doc(audit.id).set(audit).catch(()=>{});
@@ -1896,7 +1911,10 @@ function buildAdiantModal(){
   const vD=el('div',{className:'field'});vD.innerHTML='<label>Valor (R$) *</label>';const vI=el('input',{type:'number',id:'ad-valor',value:fd.valor||'',placeholder:'0,00',style:'background:var(--input);border:1px solid var(--border);border-radius:6px;padding:8px 11px;color:var(--text);font-size:13px;width:100%;outline:none;'});vD.append(vI);grid.append(vD);
   const dD=el('div',{className:'field col-2'});dD.innerHTML='<label>Descrição / Motivo</label>';const dTA=el('textarea',{id:'ad-desc',placeholder:'Ex: Adiantamento solicitado, vale transporte...',style:'background:var(--input);border:1px solid var(--border);border-radius:6px;padding:8px 11px;color:var(--text);font-size:13px;width:100%;resize:vertical;min-height:60px;outline:none;'});dTA.textContent=fd.desc||'';dD.append(dTA);grid.append(dD);body.append(grid);
   const btns=el('div',{style:'display:flex;gap:8px;justify-content:flex-end;margin-top:4px;'});const cn=el('button',{className:'btn btn-ghost'});cn.textContent='Cancelar';cn.onclick=()=>{S.modal=null;S.formData={};render();};const sv=el('button',{className:'btn btn-danger'});sv.textContent='💳 Registrar Adiantamento';
-  sv.onclick=async()=>{const fId=document.getElementById('ad-f')?.value;const data=document.getElementById('ad-data')?.value;const valor=+document.getElementById('ad-valor')?.value||0;const desc=(document.getElementById('ad-desc')?.value||'').trim();if(!fId){toast('Selecione o funcionário!',true);return;}if(valor<=0){toast('Informe um valor válido!',true);return;}sv.disabled=true;sv.textContent='Salvando...';const a={id:nid(),fId,data,valor,desc,regId:S.user.id,created:new Date().toISOString()};await FS.setAdiant(a);S.modal=null;S.formData={};render();toast('Adiantamento registrado!');};
+  sv.onclick=async()=>{const fId=document.getElementById('ad-f')?.value;const data=document.getElementById('ad-data')?.value;const valor=+document.getElementById('ad-valor')?.value||0;const desc=(document.getElementById('ad-desc')?.value||'').trim();if(!fId){toast('Selecione o funcionário!',true);return;}if(valor<=0){toast('Informe um valor válido!',true);return;}sv.disabled=true;sv.textContent='Salvando...';const a={id:nid(),fId,data,valor,desc,regId:S.user.id,created:new Date().toISOString()};await FS.setAdiant(a);
+    const _am={id:nid(),from:S.user.id,to:a.fId,texto:'Adiantamento registrado: '+fmt$(a.valor)+' em '+fmtD(a.data)+(a.desc?' — '+a.desc:''),ts:Date.now(),lida:false,tipo:'adiantamento'};
+    FS.setMsg(_am).catch(()=>{});
+    S.modal=null;S.formData={};render();toast('Adiantamento registrado!');};
   btns.append(cn,sv);body.append(btns);box.append(mh,body);return box;
 }
 
@@ -1996,8 +2014,11 @@ function valorPorExtenso(v){
 }
 
 function resolveJsPDF(){
-  if(window.jspdf&&window.jspdf.jsPDF)return window.jspdf.jsPDF;
-  if(window.jsPDF)return window.jsPDF;
+  try{
+    if(window.jspdf&&window.jspdf.jsPDF)return window.jspdf.jsPDF;
+    if(window.jsPDF)return window.jsPDF;
+    if(typeof jsPDF!=='undefined')return jsPDF;
+  }catch(e){}
   // jsPDF UMD pode criar global com nome diferente
   for(const k of Object.keys(window)){
     if(k!=='jsPDF'&&window[k]&&typeof window[k]==='function'&&window[k].toString().includes('jsPDF'))return window[k];
