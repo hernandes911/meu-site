@@ -169,6 +169,7 @@ function startListeners(cid){
   const names=['funcs','obras','apts','adiants','msgs','pagamentos','servicos'];
   syncStatus='syncing';
   names.forEach(name=>{
+    S[name]=S[name]||[];
     let first=true;
     const u=db.collection('companies').doc(cid).collection(name)
       .onSnapshot(snap=>{
@@ -526,7 +527,8 @@ function buildLoginScreen(){
 function doLogin(){
   const cpf=(document.getElementById('l-cpf')?.value||'').trim();
   const pw=document.getElementById('l-pw')?.value||'';
-  const u=S.funcs.find(f=>f.cpf===cpf&&f.senha===pw&&f.ativo);
+  const norm=s=>(s||'').replace(/[^\d]/g,'');
+  const u=S.funcs.find(f=>norm(f.cpf)===norm(cpf)&&f.senha===pw&&f.ativo);
   const err=document.getElementById('l-err');
   if(u){S.user=u;S.screen='app';S.page='dash';render();}
   else if(err){err.textContent='CPF ou senha incorretos.';err.style.display='block';}
