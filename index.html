@@ -1123,16 +1123,28 @@ function buildRel(){
   let funcsAlvo=S.funcs.filter(f=>f.cargo!=='master'&&f.ativo);
   if(S.relFuncId)funcsAlvo=funcsAlvo.filter(f=>f.id===S.relFuncId);
   const rel=funcsAlvo.map(f=>{
-    const fa=ma.filter(a=>a.fId===f.id);const fad=mad.filter(a=>a.fId===f.id);
-    const bruto=fa.reduce((s,a)=>s+a.tot,0);const adTotal=fad.reduce((s,a)=>s+a.valor,0);
-    const pgIds=new Set(S.pagamentos.filter(p=>p.fId===f.id).flatMap(p=>p.aptIds||[]));
-    return{...f,dias:fa.length,bruto,adTotal,liquido:Math.max(0,bruto-adTotal),fa,fad,pgIds};
-  }).filter(f=>f.dias>0||f.fad.length>0).sort((a,b)=>b.bruto-a.bruto);
+    const faAll=ma.filter(a=>a.fId===f.id);
+    const pgIds=new Set((S.pagamentos||[]).filter(p=>p.fId===f.id).flatMap(p=>p.aptIds||[]));
+    // Sem filtro de data: mostra so pendentes. Com filtro: mostra todos
+    const temFiltro=!!(S.relDe||S.relAte);
+    const fa=temFiltro?faAll:faAll.filter(a=>!pgIds.has(a.id));
+    const faPago=temFiltro?faAll.filter(a=>pgIds.has(a.id)):[];
+    const fad=mad.filter(a=>a.fId===f.id);
+    const bruto=faAll.reduce((s,a)=>s+a.tot,0);const adTotal=fad.reduce((s,a)=>s+a.valor,0);
+    return{...f,dias:fa.length,bruto,adTotal,liquido:Math.max(0,bruto-adTotal),fa,faPago,fad,pgIds,temFiltro};
+  }).filter(f=>f.dias>0||f.fad.length>0||(f.temFiltro&&f.faPago?.length>0)).sort((a,b)=>b.bruto-a.bruto);
   const gBruto=rel.reduce((s,f)=>s+f.bruto,0);const gAd=rel.reduce((s,f)=>s+f.adTotal,0);const gLiq=rel.reduce((s,f)=>s+f.liquido,0);
   const gPago=rel.reduce((s,f)=>s+f.fa.filter(a=>f.pgIds.has(a.id)).reduce((x,a)=>x+a.tot,0),0);
   const banner=el('div',{style:'background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;'});
   banner.innerHTML='<div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Bruto</p><div class="hdr" style="font-size:22px;color:var(--amber);">'+fmt$(gBruto)+'</div><p style="font-size:10px;color:var(--dim);">'+periodoLabel+'</p></div><div><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Adiantamentos</p><div class="hdr" style="font-size:22px;color:var(--red);">- '+fmt$(gAd)+'</div></div><div style="border-left:1px solid var(--border);padding-left:12px;"><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Saldo a Pagar</p><div class="hdr" style="font-size:26px;color:var(--green);">'+fmt$(gLiq)+'</div></div><div style="border-left:1px solid var(--border);padding-left:12px;"><p style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;">Ja Pago</p><div class="hdr" style="font-size:22px;color:var(--blue);">'+fmt$(gPago)+'</div></div>';
-  div.append(hdr,banner);
+  // Aviso quando sem filtro
+  if(!S.relDe&&!S.relAte){
+    const notice=el('div',{style:'background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);'});
+    notice.textContent='Mostrando apenas dias PENDENTES. Para ver dias ja pagos, use os filtros de data.';
+    div.append(hdr,notice,banner);
+  } else {
+    div.append(hdr,banner);
+  }
   if(!rel.length){const e=el('div',{className:'card'});e.innerHTML='<p style="color:var(--dim);text-align:center;padding:24px;">Nenhum apontamento no periodo.</p>';div.append(e);return div;}
   rel.forEach(f=>{
     const card=el('div',{className:'card'});
